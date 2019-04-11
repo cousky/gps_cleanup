@@ -4,37 +4,33 @@ import gpxpy as gpx
 import numpy as np
 import math
 import datetime as dt
-
-
-def wrapper(func, args):
-    return func(*args)
-
-def haversine(th):
-    return np.sin(th/2)**2
-
-def havlaw(lon1, lat1, lon2, lat2, radius):
-    hav_central_angle = haversine(lat2 - lat1) + np.cos(lat1)*np.cos(lat2)*haversine(lon2 - lon1)
-    return 2*radius*np.arcsin(np.sqrt(hav_central_angle))
+import haversine as h
+import unwrap_list as ul
 
 
 #Constants
-EARTH_RADIUS = 6378137
+def EARTH_RADIUS():
+    return 6378137
 
-#Extract data from xml formatted .gpx file
-ns = {'ns': 'http://www.topografix.com/GPX/1/1'}
-tree = ET.parse("C:\\Users\\Daniel\\Desktop\\4th_real_pace5_20_1_25km.gpx")
-root = tree.getroot()
+def trackpoints(filepath):
+    #Extract data from xml formatted .gpx file
+    ns = {'ns': 'http://www.topografix.com/GPX/1/1'}
+    tree = ET.parse(filepath)
+    root = tree.getroot()
+    trkpts = (root
+                  .find('ns:trk', ns)
+                  .find('ns:trkseg', ns)
+                  .findall('ns:trkpt', ns))
+    return trkpts
 
-#Go down the tree
-trk = root.find('ns:trk',ns)
-trkpts_ele = trk.find('ns:trkseg',ns).findall('ns:trkpt',ns)
-data_len = len(trkpts_ele)
+trkpts = trackpoints("C:\\Users\\Daniel\\Desktop\\4th_real_pace5_20_1_25km.gpx")
+data_len = len(trkpts)
 
 # TODO(DANIEL): Implement ignoring date if no change in date through file
 '''
-fst_pt = trkpts_ele[0].find('ns:time', ns).text.split('T')
+fst_pt = trkpts[0].find('ns:time', ns).text.split('T')
 fst_dt = fst_pt[0].split('-')
-lst_pt = trkpts_ele[-1].find('ns:time', ns).text.split('T')
+lst_pt = trkpts[-1].find('ns:time', ns).text.split('T')
 lst_dt = lst_pt[0].split('-')
 not_same_date = 0
 for i, j in fst_dt, lst_dt:
@@ -54,7 +50,7 @@ Time
 6, 7, 8: Hours, Minutes, Seconds
 '''
 pts = np.zeros((data_len, 9))
-for ind, pnt in enumerate(trkpts_ele):
+for ind, pnt in enumerate(trkpts):
     pts[ind, 0] = pnt.attrib['lon']
     pts[ind, 1] = pnt.attrib['lat']
     pts[ind, 2] = pnt.find('ns:ele', ns).text
@@ -65,8 +61,8 @@ for ind, pnt in enumerate(trkpts_ele):
     pts[ind, 6:] = time
 
 #Calculates the total time assuming ordered points
-first_pt_dt = wrapper(dt.datetime, [int(i) for i in pts[0, 3:]])
-last_pt_dt = wrapper(dt.datetime, [int(i) for i in pts[-1, 3:]])
+first_pt_dt = ul.unwrap(dt.datetime, [int(i) for i in pts[0, 3:]])
+last_pt_dt = ul.unwrap(dt.datetime, [int(i) for i in pts[-1, 3:]])
 total_time = last_pt_dt - first_pt_dt
 
 #Computes Statistical data for the elevation markers
@@ -83,7 +79,7 @@ elevation_arr /= std_elevation
 my_list = []
 pos = np.radians(pts[:,:2].copy())
 for i in range(data_len - 1):
-    my_list.append(havlaw(pos[i, 0], pos[i, 1], pos[i + 1, 0], pos[i + 1, 1], EARTH_RADIUS))
+    my_list.append(h.havlaw(pos[i, 0], pos[i, 1], pos[i + 1, 0], pos[i + 1, 1], EARTH_RADIUS()))
 print('')
 
 for i in range(data_len):
